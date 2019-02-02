@@ -6,6 +6,7 @@ using System.Reflection;
 using UnityEngine;
 using KSP.IO;
 using System.Diagnostics;
+using UnityEngine.Profiling;
 using UnityToolbag;
 using Debug = UnityEngine.Debug;
 using File = KSP.IO.File;
@@ -29,6 +30,7 @@ namespace MuMech
 
         private bool ready = false;
 
+        public MechJebModuleGuidanceController guidance;
         public MechJebModuleAttitudeController attitude;
         public MechJebModuleStagingController staging;
         public MechJebModuleThrustController thrust;
@@ -39,21 +41,19 @@ namespace MuMech
         public MechJebModuleRoverController rover;
         public MechJebModuleNodeExecutor node;
         public MechJebModuleSolarPanelController solarpanel;
+        public MechJebModuleDeployableAntennaController antennaControl;
         public MechJebModuleLandingAutopilot landing;
         public MechJebModuleSettings settings;
         public MechJebModuleAirplaneAutopilot airplane;
+        public MechJebModuleStageStats stageStats;
+        public MechJebModuleLogicalStageTracking stageTracking;
 
         public VesselState vesselState = new VesselState();
-
         [KSPField(isPersistant = true, guiActive = true, guiActiveEditor = true, guiName = "MechJeb"), UI_Toggle(disabledText = "Disabled", enabledText = "Enabled")]
         public bool running = true;
-
         private Vessel controlledVessel; //keep track of which vessel we've added our onFlyByWire callback to
-
         public string version = "";
-
         private bool deactivateControl = false;
-
         public MechJebCore MasterMechJeb
         {
             get { return vessel.GetMasterMechJeb(); }
@@ -85,6 +85,11 @@ namespace MuMech
         public bool eduMode = false;
 
         public bool rssMode { get { return settings.rssMode; } }
+
+        public bool ShowGui
+        {
+            get { return showGui; }
+        }
 
         [KSPAction("Orbit Prograde")]
         public void OnOrbitProgradeAction(KSPActionParam param)
@@ -366,7 +371,7 @@ namespace MuMech
             sortedModules[key] = value = unorderedComputerModules.OfType<T>().Cast<ComputerModule>().OrderBy(m => m).ToList();
             return value;
         }
-        
+
         // Added because the generic version eats memory like candy when casting from ComputerModule to DisplayModule (.Cast<T>())
         public List<DisplayModule> GetDisplayModules(IComparer<DisplayModule> comparer)
         {
@@ -454,8 +459,8 @@ namespace MuMech
                 OnLoad(null);
             }
 
-            GameEvents.onShowUI.Add(ShowGUI);
-            GameEvents.onHideUI.Add(HideGUI);
+            GameEvents.onShowUI.Add(OnShowGUI);
+            GameEvents.onHideUI.Add(OnHideGUI);
             GameEvents.onVesselChange.Add(UnlockControl);
 
             lastSettingsSaveTime = Time.time;
@@ -749,9 +754,13 @@ namespace MuMech
             rover = GetComputerModule<MechJebModuleRoverController>();
             node = GetComputerModule<MechJebModuleNodeExecutor>();
             solarpanel = GetComputerModule<MechJebModuleSolarPanelController>();
+            antennaControl = GetComputerModule<MechJebModuleDeployableAntennaController>();
             landing = GetComputerModule<MechJebModuleLandingAutopilot>();
             settings = GetComputerModule<MechJebModuleSettings>();
             airplane = GetComputerModule<MechJebModuleAirplaneAutopilot>();
+            guidance = GetComputerModule<MechJebModuleGuidanceController>();
+            stageStats = GetComputerModule<MechJebModuleStageStats>();
+            stageTracking = GetComputerModule<MechJebModuleLogicalStageTracking>();
         }
 
         public override void OnLoad(ConfigNode sfsNode)
@@ -972,8 +981,8 @@ namespace MuMech
                 OnSave(null);
             }
 
-            GameEvents.onShowUI.Remove(ShowGUI);
-            GameEvents.onHideUI.Remove(HideGUI);
+            GameEvents.onShowUI.Remove(OnShowGUI);
+            GameEvents.onHideUI.Remove(OnHideGUI);
             GameEvents.onVesselChange.Remove(UnlockControl);
 
             if (weLockedInputs)
@@ -1014,6 +1023,10 @@ namespace MuMech
 
         private void Drive(FlightCtrlState s)
         {
+            Profiler.BeginSample("vesselState");
+            ready = vesselState.Update(vessel);
+            Profiler.EndSample();
+
             Profiler.BeginSample("MechJebCore.Drive");
             if (this == vessel.GetMasterMechJeb())
             {
@@ -1055,11 +1068,11 @@ namespace MuMech
             s.Z = Mathf.Clamp(s.Z, -1, 1);
         }
 
-        private void ShowGUI()
+        private void OnShowGUI()
         {
             showGui = true;
         }
-        private void HideGUI()
+        private void OnHideGUI()
         {
             showGui = false;
         }

@@ -76,7 +76,7 @@ namespace MuMech
 
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("ASL: " + MuUtils.ToSI(ASL, -1, 4) + "m");
-                GUILayout.Label(ScienceUtil.GetExperimentBiome(core.target.targetBody, core.target.targetLatitude, core.target.targetLongitude));
+                GUILayout.Label(core.target.targetBody.GetExperimentBiomeSafe(core.target.targetLatitude, core.target.targetLongitude));
                 GUILayout.EndHorizontal();
             }
             else
@@ -199,7 +199,7 @@ namespace MuMech
                     case ReentrySimulation.Outcome.LANDED:
                         GUILayout.Label("Landing Predictions:");
                         GUILayout.Label(Coordinates.ToStringDMS(result.endPosition.latitude, result.endPosition.longitude) + "\nASL:" + MuUtils.ToSI(result.endASL,-1, 4) + "m");
-                        GUILayout.Label(ScienceUtil.GetExperimentBiome(result.body, result.endPosition.latitude, result.endPosition.longitude));
+                        GUILayout.Label(result.body.GetExperimentBiomeSafe(result.endPosition.latitude, result.endPosition.longitude));
                         double error = Vector3d.Distance(mainBody.GetWorldSurfacePosition(result.endPosition.latitude, result.endPosition.longitude, 0) - mainBody.position,
                                                          mainBody.GetWorldSurfacePosition(core.target.targetLatitude, core.target.targetLongitude, 0) - mainBody.position);
                         GUILayout.Label("Target difference = " + MuUtils.ToSI(error, 0) + "m"
@@ -245,7 +245,7 @@ namespace MuMech
 
                     if (launchSiteName == null || lat == null || lon == null)
                     {
-                        print("un null");
+                        print("Ignore langing site with null value");
                         continue;
                     }
 
@@ -269,31 +269,7 @@ namespace MuMech
                     }
                 }
             }
-
-
-            if (GameDatabase.Instance.GetConfigs("REALSOLARSYSTEM").Length == 0)
-            {
-                // Don't add the default site if RSS is present
-                // Create a default config file in MJ dir for those ?
-                if (!landingSites.Any(p => p.name == "KSC Pad"))
-                    landingSites.Add(new LandingSite()
-                    {
-                        name = "KSC Pad",
-                        latitude = -0.09694444,
-                        longitude = -74.5575,
-                        body = Planetarium.fetch.Home
-                    });
-
-                if (!landingSites.Any(p => p.name == "VAB"))
-                    landingSites.Add(new LandingSite()
-                    {
-                        name = "VAB",
-                        latitude = -0.09694444,
-                        longitude = -74.617,
-                        body = Planetarium.fetch.Home
-                    });
-            }
-
+            
             // Import KerbTown/Kerbal-Konstructs launch site
             foreach (var config in GameDatabase.Instance.GetConfigs("STATIC"))
             {
